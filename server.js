@@ -1,12 +1,13 @@
-const path = require('path');
-const os = require('os');
-const url = require('url');
-const express = require('express')
-const multer = require('multer')
-const jpeg = require('jpeg-js')
-const PNG = require('pngjs').PNG;
-const tf = require('@tensorflow/tfjs-node')
-const nsfw = require('nsfwjs')
+import path, { dirname } from 'path';
+import os from 'os'
+import url, { fileURLToPath } from 'url'
+import express from 'express'
+import multer from 'multer'
+import jpeg from 'jpeg-js';
+import { PNG } from 'pngjs'
+import tf from '@tensorflow/tfjs-node'
+import nsfw from 'nsfwjs';
+import { fileTypeFromBuffer } from 'file-type'
 
 const app = express()
 const upload = multer()
@@ -42,12 +43,39 @@ const decodeImage = function (imageType, image) {
   return jpeg.decode(image, true);
 }
 
+const SUPPORTED_TYPES = ['image/png', 'image/jpeg'];
+
 app.post('/nsfw', upload.single("image"), async (req, res) => {
   if (!req.file)
     res.status(400).send("Missing image multipart/form-data")
   else {
     try {
-      const fileType = req.file.mimetype;
+      let fileType = req.file.mimetype;
+
+      if (!SUPPORTED_TYPES.includes(fileType.toLowerCase())) {
+        res.json({
+          code: -1,
+          message: 'Not supported file type',
+        })
+        return;
+      }
+
+      try {
+        const { ext, mime } = await fileTypeFromBuffer(req.file.buffer);
+        fileType = mime;
+
+        if (!SUPPORTED_TYPES.includes(fileType.toLowerCase())) {
+          res.json({
+            code: -1,
+            message: 'Mismatch file type',
+          })
+          return;
+        }
+      } catch (error) {
+        console.error(error);
+      }
+
+
       const imageData = await decodeImage(fileType, req.file.buffer);
       const image = await convert(imageData)
       const predictions = await _model.classify(image)
@@ -65,6 +93,7 @@ app.post('/nsfw', upload.single("image"), async (req, res) => {
 });
 
 const load_model = async () => {
+  const __dirname = fileURLToPath(dirname(import.meta.url));
   let modelPath = url.pathToFileURL(path.resolve(__dirname, './model/web_model/')).pathname;
   if (os.platform() === 'win32') {
     modelPath = `file:/${modelPath}/`

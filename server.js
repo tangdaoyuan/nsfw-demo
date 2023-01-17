@@ -1,4 +1,5 @@
 const path = require('path');
+const os = require('os');
 const url = require('url');
 const express = require('express')
 const multer = require('multer')
@@ -65,7 +66,12 @@ app.post('/nsfw', upload.single("image"), async (req, res) => {
 
 const load_model = async () => {
   let modelPath = url.pathToFileURL(path.resolve(__dirname, './model/web_model/')).pathname;
-  modelPath = `file:/${modelPath}/`
+  if (os.platform() === 'win32') {
+    modelPath = `file:/${modelPath}/`
+  } else {
+    modelPath = `file://${modelPath}/`
+  }
+
   _model = await nsfw.load(modelPath, { type: 'graph' })
 }
 

@@ -82,3 +82,6 @@ dist
 .DS_Store
 
 Data
+
+*-range.json
+*-flaw.json

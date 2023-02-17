@@ -29,33 +29,29 @@ const convert = async (image) => {
 
 
 const decodeImage = function (imageType, image) {
-    if (imageType === 'image/webp') {
-       return new Promise((resolve, reject) => {
-          Sharp(image)
-            .resize({width: 512})
-            .toFormat('jpeg')
-            .toBuffer({resolveWithObject: true})
-            .then(({data, info}) => {
-              const imageData = jpeg.decode(data, true);
-              resolve(imageData)
-            })
-            .catch(err => { reject(err) });
-       });
-    }
-
-  if (imageType === 'image/png') {
-    return new Promise((resolve, reject) => {
-      new PNG({ filterType: 4 }).parse(image, async function (error, data) {
-        if (!error) {
-          resolve(data);
-        } else {
-          reject(new Error('invalid image/png format'));
-        }
-      });
-    })
-  }
-
-  return jpeg.decode(image, true);
+  return new Promise((resolve, reject) => {
+    // Sharp(image)
+    //   .modulate({
+    //     saturation: 0.7
+    //   })
+    //   .blur(2)
+    //   .resize({width: 512})
+    //   .toFormat('jpeg')
+    //   .toFile('test.jpg')
+    Sharp(image)
+      .modulate({
+        saturation: 0.7
+      })
+      .blur(2)
+      .resize({width: 512})
+      .toFormat('jpeg')
+      .toBuffer({resolveWithObject: true})
+      .then(({data, info}) => {
+        const imageData = jpeg.decode(data, true);
+        resolve(imageData);
+      })
+      .catch(err => { reject(err) });
+  });
 }
 
 const SUPPORTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];

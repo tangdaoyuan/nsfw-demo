@@ -4,6 +4,7 @@ import url, { fileURLToPath } from 'url'
 import express from 'express'
 import multer from 'multer'
 import jpeg from 'jpeg-js';
+import Sharp from 'sharp';
 import { PNG } from 'pngjs'
 import tf from '@tensorflow/tfjs-node'
 import nsfw from 'nsfwjs';
@@ -28,6 +29,20 @@ const convert = async (image) => {
 
 
 const decodeImage = function (imageType, image) {
+    if (imageType === 'image/webp') {
+       return new Promise((resolve, reject) => {
+          Sharp(image)
+            .resize({width: 512})
+            .toFormat('jpeg')
+            .toBuffer({resolveWithObject: true})
+            .then(({data, info}) => {
+              const imageData = jpeg.decode(data, true);
+              resolve(imageData)
+            })
+            .catch(err => { reject(err) });
+       });
+    }
+
   if (imageType === 'image/png') {
     return new Promise((resolve, reject) => {
       new PNG({ filterType: 4 }).parse(image, async function (error, data) {
@@ -43,7 +58,7 @@ const decodeImage = function (imageType, image) {
   return jpeg.decode(image, true);
 }
 
-const SUPPORTED_TYPES = ['image/png', 'image/jpeg'];
+const SUPPORTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 app.post('/nsfw', upload.single("image"), async (req, res) => {
   if (!req.file)

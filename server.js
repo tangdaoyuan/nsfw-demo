@@ -5,7 +5,6 @@ import express from 'express'
 import multer from 'multer'
 import jpeg from 'jpeg-js';
 import Sharp from 'sharp';
-import { PNG } from 'pngjs'
 import tf from '@tensorflow/tfjs-node'
 import nsfw from 'nsfwjs';
 import { fileTypeFromBuffer } from 'file-type'
@@ -30,14 +29,6 @@ const convert = async (image) => {
 
 const decodeImage = function (imageType, image) {
   return new Promise((resolve, reject) => {
-    // Sharp(image)
-    //   .modulate({
-    //     saturation: 0.7
-    //   })
-    //   .blur(2)
-    //   .resize({width: 512})
-    //   .toFormat('jpeg')
-    //   .toFile('test.jpg')
     Sharp(image)
       .modulate({
         saturation: 0.7

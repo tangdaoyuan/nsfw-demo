@@ -27,7 +27,7 @@ const decodeImage = function (imageType, image) {
     return new Promise((resolve, reject) => {
       Sharp(image)
         .modulate({
-          saturation: 0.7
+          saturation: 0.7,
         })
         .blur(2)
         .resize({width: 512})
@@ -59,12 +59,12 @@ async function testSingleFile(buf, cb) {
       console.error(error);
     }
   
-    const imageData = await decodeImage(fileType, buf);
-    const image = await convert(imageData)
-    const predictions = await _model.classify(image)
-    image.dispose()
+    const imageData1 = await decodeImage(fileType, buf);
+    const image1 = await convert(imageData1)
+    const predictions1 = await _model.classify(image1)
+    image1.dispose()
 
-    cb(predictions)
+    cb(predictions1)
   } catch (error) {
     console.error(error);
   }
@@ -78,8 +78,8 @@ async function test(dataDir, verify) {
   for (let dir of dirs) {
     const absImagePath = path.resolve(absDir, dir);
     const buf = await fs.readFile(absImagePath)
-    await testSingleFile(buf, (prediction) => {
-      verify(absImagePath, prediction)
+    await testSingleFile(buf, (prediction1, prediction2) => {
+      verify(absImagePath, prediction1, prediction2)
     })
   }
 }
@@ -98,35 +98,36 @@ const load_model = async () => {
   _model = await nsfw.load(modelPath, { type: 'graph' })
 }
 
-
-
-const posDir = './Data/positive';
 const negDir = './Data/negative';
 const rawDir = './Data/raw/pictrues';
 const sexyDir = './Data/sexy';
 
 
-// the smaller the Drawing value, the more SFW
+// the smaller the Sexy value, the more SFW
 function doubleCheckSFW(predictions) {
-  return predictions.every(pred => {
+  return predictions.some(pred => {
     const {className, probability} = pred;
-    if (className === 'Drawing') {
+    if (className === 'Sexy') {
       // sfw
-      return probability < 0.01;
+      return probability > 0.01;
     }
 
-    return true;
+    return false;
   })
 }
 
-async function sexyTest() {
+
+const PORN_THRESHOLD = 0.7
+
+async function sexyTest(copyFile = false) {
   let sexyRets = [];
   await test(sexyDir, async (filePath, predictions) => {
     const ret = predictions.some(pred => {
       const {className, probability} = pred;
-      return ['Porn', 'Hentai'].includes(className) && probability > 0.7;
+      return ['Porn'].includes(className) && probability > PORN_THRESHOLD;
     });
-    if (ret && !doubleCheckSFW(predictions)) {
+
+    if (ret) {
       sexyRets.push({
         filePath,
         predictions: predictions.reduce((acc, cur) => {
@@ -137,6 +138,12 @@ async function sexyTest() {
     }
   });
   await fs.writeFile('./sexy-flaw.json', JSON.stringify(sexyRets, null, 2));
+
+  if (copyFile) {
+    for (let ret of sexyRets) {
+      await fs.copyFile(ret.filePath, path.resolve('./temp', path.basename(ret.filePath)));
+    }
+  }
 }
 
 async function normalTest() {
@@ -144,9 +151,9 @@ async function normalTest() {
   await test(rawDir, async (filePath, predictions) => {
     const ret = predictions.some(pred => {
       const {className, probability} = pred;
-      return ['Porn', 'Hentai'].includes(className) && probability > 0.7;
+      return ['Porn'].includes(className) && probability > PORN_THRESHOLD;
     });
-    if (ret && !doubleCheckSFW(predictions)) {
+    if (ret) {
       normalRets.push({
         filePath,
         predictions: predictions.reduce((acc, cur) => {
@@ -160,17 +167,18 @@ async function normalTest() {
 }
 
 
-async function negTest() {
+async function negTest(copyFile = false) {
   const negRets = [];
   await test(negDir, (filePath, predictions) => {
     const ret = predictions.every(pred => {
       const {className, probability} = pred;
-      if (!['Porn', 'Hentai'].includes(className)) {
+      if (!['Porn'].includes(className)) {
         return true;
       }
-      return probability < 0.7;
+      return probability < PORN_THRESHOLD;
     });
-    if (ret && doubleCheckSFW(predictions)) {
+
+    if (ret) {
       negRets.push({
         filePath,
         predictions: predictions.reduce((acc, cur) => {
@@ -181,6 +189,12 @@ async function negTest() {
     }
   });
   await fs.writeFile('./negative-flaw.json', JSON.stringify(negRets, null, 2));
+
+  if (copyFile) {
+    for (let neg of negRets) {
+      await fs.copyFile(neg.filePath, path.resolve('./temp', path.basename(neg.filePath)));
+    }
+  }
 }
 
 
@@ -229,7 +243,7 @@ async function createRangeTest(targetDir) {
       }
      }
      if (className === 'Drawing') {
-      for (let key of Object.keys(sexyRets)) {
+      for (let key of Object.keys(drawRets)) {
          if (probability * 100 < +key) {
             drawRets[key]++;
             break;
@@ -274,10 +288,10 @@ async function normalRangeTest() {
 }
 
 load_model().then(async () => {
+  await negRangeTest();
+  await sexyRangeTest();
+  await normalRangeTest();
   await sexyTest();
   await normalTest();
   await negTest();
-  // await negRangeTest();
-  // await sexyRangeTest();
-  // await normalRangeTest();
 })

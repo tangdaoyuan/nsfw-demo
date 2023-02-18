@@ -124,7 +124,7 @@ async function sexyTest(copyFile = false) {
   await test(sexyDir, async (filePath, predictions) => {
     const ret = predictions.some(pred => {
       const {className, probability} = pred;
-      return ['Porn'].includes(className) && probability > PORN_THRESHOLD;
+      return ['Porn', 'Hentai'].includes(className) && probability > PORN_THRESHOLD;
     });
 
     if (ret) {
@@ -151,7 +151,7 @@ async function normalTest() {
   await test(rawDir, async (filePath, predictions) => {
     const ret = predictions.some(pred => {
       const {className, probability} = pred;
-      return ['Porn'].includes(className) && probability > PORN_THRESHOLD;
+      return ['Porn', 'Hentai'].includes(className) && probability > PORN_THRESHOLD;
     });
     if (ret) {
       normalRets.push({
@@ -170,15 +170,15 @@ async function normalTest() {
 async function negTest(copyFile = false) {
   const negRets = [];
   await test(negDir, (filePath, predictions) => {
-    const ret = predictions.every(pred => {
+    const ret = predictions.some(pred => {
       const {className, probability} = pred;
-      if (!['Porn'].includes(className)) {
-        return true;
+      if (!['Porn', 'Hentai'].includes(className)) {
+        return false;
       }
-      return probability < PORN_THRESHOLD;
+      return probability > PORN_THRESHOLD;
     });
 
-    if (ret) {
+    if (!ret) {
       negRets.push({
         filePath,
         predictions: predictions.reduce((acc, cur) => {
@@ -288,10 +288,10 @@ async function normalRangeTest() {
 }
 
 load_model().then(async () => {
-  await negRangeTest();
-  await sexyRangeTest();
-  await normalRangeTest();
-  await sexyTest();
+  // await negRangeTest();
+  // await sexyRangeTest();
+  // await normalRangeTest();
+  // await sexyTest();
   await normalTest();
-  await negTest();
+  // await negTest();
 })

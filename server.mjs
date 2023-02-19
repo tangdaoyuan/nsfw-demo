@@ -3,11 +3,10 @@ import os from 'os'
 import url, { fileURLToPath } from 'url'
 import express from 'express'
 import multer from 'multer'
-import jpeg from 'jpeg-js';
-import Sharp from 'sharp';
 import tf from '@tensorflow/tfjs-node'
 import nsfw from 'nsfwjs';
 import { fileTypeFromBuffer } from 'file-type'
+import { decodeRealityImage, decodeAnimeImage } from './util.mjs'
 
 const app = express()
 const upload = multer()
@@ -26,41 +25,23 @@ const convert = async (image) => {
   return tf.tensor3d(values, [image.height, image.width, numChannels], 'int32')
 }
 
-
-const decodeImage = function (imageType, image) {
-  return new Promise((resolve, reject) => {
-    Sharp(image)
-      .modulate({
-        saturation: 0.7
-      })
-      .blur(2)
-      .resize({width: 512})
-      .toFormat('jpeg')
-      .toBuffer({resolveWithObject: true})
-      .then(({data, info}) => {
-        const imageData = jpeg.decode(data, true);
-        resolve(imageData);
-      })
-      .catch(err => { reject(err) });
-  });
-}
-
 const SUPPORTED_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 app.post('/nsfw', upload.single("image"), async (req, res) => {
   if (!req.file)
     res.status(400).send("Missing image multipart/form-data")
   else {
+    const picType = req.body.type;
     try {
       let fileType = req.file.mimetype;
 
-      if (!SUPPORTED_TYPES.includes(fileType.toLowerCase())) {
-        res.json({
-          code: -1,
-          message: 'Not supported file type',
-        })
-        return;
-      }
+      // if (!SUPPORTED_TYPES.includes(fileType.toLowerCase())) {
+      //   res.json({
+      //     code: -1,
+      //     message: 'Not supported file type',
+      //   })
+      //   return;
+      // }
 
       try {
         const { ext, mime } = await fileTypeFromBuffer(req.file.buffer);
@@ -77,8 +58,14 @@ app.post('/nsfw', upload.single("image"), async (req, res) => {
         console.error(error);
       }
 
+      let imageData = null;
+      if (+picType === 2) {
+        imageData = await decodeAnimeImage(fileType, req.file.buffer);
+      } else {
+        imageData = await decodeRealityImage(fileType, req.file.buffer);
+      }
 
-      const imageData = await decodeImage(fileType, req.file.buffer);
+
       const image = await convert(imageData)
       const predictions = await _model.classify(image)
       image.dispose()
